@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#10131b">
+<title>Le Guide TV</title>
+<style>
+:root{color-scheme:dark;--bg:#0d1017;--panel:#171c27;--panel2:#202737;--muted:#9ba6b8;--text:#f4f6fb;--accent:#8b7cff;--line:#2a3242;--green:#4ed6a0}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:15px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+header{position:sticky;top:0;z-index:5;background:#10131bf2;backdrop-filter:blur(16px);border-bottom:1px solid var(--line);padding:env(safe-area-inset-top) 16px 12px}
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px}.brand{font-weight:850;font-size:21px;letter-spacing:-.7px}.brand span{color:var(--accent)}.status{font-size:11px;color:var(--green);background:#17362e;padding:6px 9px;border-radius:20px}
+.sub{color:var(--muted);font-size:12px;margin-top:4px}
+main{max-width:1050px;margin:auto;padding:16px 14px 90px}
+.tools{display:flex;gap:9px;margin:12px 0;flex-wrap:wrap}
+input,select,button{font:inherit;color:var(--text);border:1px solid var(--line);background:var(--panel);border-radius:12px;padding:12px}
+input{flex:1;min-width:160px}select{max-width:100%}button{cursor:pointer}button.primary{background:var(--accent);border-color:var(--accent);font-weight:700}
+.days{display:flex;gap:7px;overflow:auto;padding:5px 0 13px;scrollbar-width:none}.days button{white-space:nowrap;padding:9px 13px;font-size:13px}.days button.active{background:var(--panel2);border-color:var(--accent);color:#c8c1ff}
+.filters{display:flex;gap:8px;overflow:auto;padding-bottom:12px}.filters button{white-space:nowrap;font-size:12px;padding:8px 11px}
+.heading{display:flex;align-items:center;justify-content:space-between;margin:12px 2px}.heading h2{font-size:18px;margin:0}.muted{color:var(--muted);font-size:12px}
+.notice{background:#1c2230;border:1px solid var(--line);border-radius:14px;padding:13px;color:#c7d0df;font-size:13px;line-height:1.5;margin:12px 0}
+.channel{background:var(--panel);border:1px solid var(--line);border-radius:15px;margin:9px 0;overflow:hidden}
+.channelhead{display:flex;align-items:center;gap:12px;padding:12px;cursor:pointer}
+.logo{width:42px;height:42px;display:grid;place-items:center;border-radius:11px;background:var(--panel2);font-size:11px;font-weight:800;color:#d5d0ff;overflow:hidden;flex:none}
+.logo img{width:100%;height:100%;object-fit:contain;background:white}
+.chname{font-weight:750}.chid{font-size:11px;color:var(--muted);margin-top:3px}.chev{margin-left:auto;color:var(--muted)}
+.programs{border-top:1px solid var(--line);padding:4px 12px 10px}
+.program{display:grid;grid-template-columns:58px 1fr;gap:10px;padding:10px 0;border-bottom:1px solid #252d3a}.program:last-child{border:0}
+.time{font-variant-numeric:tabular-nums;color:#bcb4ff;font-weight:750;font-size:13px}
+.pname{font-weight:650}.desc{font-size:12px;color:var(--muted);margin-top:4px;line-height:1.45}
+.progress{height:3px;background:#2c3444;margin-top:7px;border-radius:4px;overflow:hidden}.progress i{display:block;height:100%;background:var(--green)}
+.empty{text-align:center;color:var(--muted);padding:35px 15px}
+footer{position:fixed;bottom:0;left:0;right:0;background:#10131bf2;backdrop-filter:blur(15px);border-top:1px solid var(--line);padding:10px 14px calc(10px + env(safe-area-inset-bottom));display:flex;justify-content:center;gap:9px}
+footer button{font-size:12px;padding:10px 13px}
+.small{font-size:11px;color:var(--muted);line-height:1.5}
+a{color:#bdb5ff}
+@media(min-width:700px){.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.channel{margin:0}.programs{max-height:450px;overflow:auto}}
+</style>
+</head>
+<body>
+<header>
+ <div class="top"><div><div class="brand">LE GUIDE <span>TV</span></div><div class="sub" id="todayline">Votre programme télé</div></div><div class="status" id="status">Connexion aux programmes…</div></div>
+</header>
+<main>
+ <div class="notice" id="notice">Chargement du guide TV… Les programmes proviennent d'une source communautaire externe. La couverture et la durée disponible dépendent de cette source.</div>
+ <div class="tools">
+  <input id="search" type="search" placeholder="Rechercher une chaîne ou une émission…">
+  <select id="bouquet"><option value="all">Toutes les chaînes</option><option value="tnt">Chaînes principales</option></select>
+ </div>
+ <div class="days" id="days"></div>
+ <div class="filters" id="filters">
+  <button class="active" data-filter="all">Toutes</button><button data-filter="now">En ce moment</button><button data-filter="film">Films</button><button data-filter="series">Séries</button><button data-filter="sport">Sport</button><button data-filter="info">Information</button><button data-filter="doc">Documentaires</button>
+ </div>
+ <div class="heading"><h2 id="heading">À l'antenne</h2><span class="muted" id="count"></span></div>
+ <div id="list" class="grid"><div class="empty">Récupération des programmes…</div></div>
+ <p class="small">Données : XML TV FR. Ce guide affiche les programmes réellement présents dans le flux source. Certaines chaînes peuvent ne pas avoir de grille ou de description. Les données sont chargées depuis la source et mises en cache sur votre appareil.</p>
+</main>
+<footer>
+ <button class="primary" id="refresh">↻ Actualiser</button>
+ <button id="favorites">★ Favoris <span id="favcount"></span></button>
+ <button id="allchannels">▦ Chaînes</button>
+</footer>
+<script>
+const EPG_URL='https://xmltvfr.fr/xmltv/xmltv.xml.gz';
+const TNT_URL='https://xmltvfr.fr/xmltv/xmltv_tnt.xml.gz';
+const $=s=>document.querySelector(s);
+let channels=[],programmes=[],selectedDate=new Date(),filter='all',onlyFav=false,showAll=true,favorites=new Set(JSON.parse(localStorage.getItem('tv-favs')||'[]'));
+const fmtDate=d=>new Intl.DateTimeFormat('fr-FR',{weekday:'short',day:'numeric',month:'short'}).format(d);
+const dayKey=d=>{let x=new Date(d);x.setHours(0,0,0,0);return x.getTime()};
+function parseStamp(s){let m=s.match(/^(\d{4})(\d\d)(\d\d)(\d\d)(\d\d)(\d\d)\s*([+-]\d\d\d\d)?/);if(!m)return null;let t=Date.UTC(+m[1],+m[2]-1,+m[3],+m[4],+m[5],+m[6]);if(m[7]){let z=m[7],off=(z[0]==='-'?-1:1)*(+z.slice(1,3)*60 + +z.slice(3,5));t-=off*60000}return new Date(t)}
+function txt(el,tag){return el.getElementsByTagName(tag)[0]?.textContent?.trim()||''}
+function safe(s){return (s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function category(p){let s=(p.cat||'').toLowerCase()+' '+p.title.toLowerCase();if(/film|cinéma|movie/.test(s))return'film';if(/série|feuilleton|episode/.test(s))return'series';if(/sport|football|rugby|tennis/.test(s))return'sport';if(/journal|information|actualité|news/.test(s))return'info';if(/documentaire|docu/.test(s))return'doc';return'other'}
+function localTime(d){return new Intl.DateTimeFormat('fr-FR',{hour:'2-digit',minute:'2-digit'}).format(d)}
+function makeDays(){let el=$('#days');el.innerHTML='';for(let i=0;i<8;i++){let d=new Date();d.setHours(0,0,0,0);d.setDate(d.getDate()+i);let b=document.createElement('button');b.textContent=i===0?"Aujourd'hui":i===1?'Demain':fmtDate(d);b.className=dayKey(d)===dayKey(selectedDate)?'active':'';b.onclick=()=>{selectedDate=d;makeDays();render()};el.append(b)}}
+function render(){
+ const q=$('#search').value.toLowerCase().trim(),now=new Date(),start=dayKey(selectedDate),end=start+86400000;
+ $('#heading').textContent=filter==='now'?'En ce moment':fmtDate(selectedDate);
+ let list=channels.map(c=>({...c,ps:programmes.filter(p=>p.channel===c.id&&p.start<end&&p.stop>start)}));
+ list=list.filter(c=>c.ps.length && (!q||c.name.toLowerCase().includes(q)||c.ps.some(p=>(p.title+' '+p.desc).toLowerCase().includes(q))) && (!onlyFav||favorites.has(c.id)));
+ if(filter==='now')list=list.filter(c=>c.ps.some(p=>p.start<=now&&p.stop>now));
+ else if(filter!=='all')list=list.filter(c=>c.ps.some(p=>category(p)===filter));
+ if(!showAll)list=list.slice(0,40);
+ $('#count').textContent=list.length+' chaîne(s)';
+ $('#favcount').textContent=favorites.size?'('+favorites.size+')':'';
+ $('#list').innerHTML=list.length?'':'<div class="empty">Aucun programme trouvé pour ces critères.</div>';
+ for(const c of list){
+  const card=document.createElement('section');card.className='channel';
+  const head=document.createElement('div');head.className='channelhead';
+  let logo=c.icon?`<img src="${safe(c.icon)}" loading="lazy" onerror="this.remove()">`:safe(c.name.slice(0,4).toUpperCase());
+  head.innerHTML=`<div class="logo">${logo}</div><div><div class="chname">${safe(c.name)}</div><div class="chid">${c.ps.length} programme(s) sur cette journée</div></div><button class="favbtn" aria-label="Favori" style="margin-left:auto;padding:7px 10px;background:transparent;border:0;color:${favorites.has(c.id)?'#ffd76a':'#9ba6b8'}">${favorites.has(c.id)?'★':'☆'}</button><div class="chev">⌄</div>`;
+  const body=document.createElement('div');body.className='programs';
+  c.ps.sort((a,b)=>a.start-b.start).forEach(p=>{
+   let active=p.start<=now&&p.stop>now,mins=Math.max(1,(p.stop-p.start)/60000),pct=active?Math.min(100,Math.max(0,(now-p.start)/ (p.stop-p.start)*100)):0;
+   const row=document.createElement('div');row.className='program';
+   row.innerHTML=`<div class="time">${localTime(p.start)}<div class="muted">${localTime(p.stop)}</div></div><div><div class="pname">${active?'● ':''}${safe(p.title)}</div>${p.desc?`<div class="desc">${safe(p.desc)}</div>`:''}${active?`<div class="progress"><i style="width:${pct}%"></i></div>`:''}</div>`;
+   body.append(row);
+  });
+  head.querySelector('.favbtn').onclick=(ev)=>{ev.stopPropagation();if(favorites.has(c.id))favorites.delete(c.id);else favorites.add(c.id);localStorage.setItem('tv-favs',JSON.stringify([...favorites]));render()};head.onclick=()=>{body.hidden=!body.hidden;head.querySelector('.chev').textContent=body.hidden?'›':'⌄'};
+  card.append(head,body);$('#list').append(card);
+ }
+}
+async function load(){
+ $('#status').textContent='Chargement…';$('#notice').textContent='Téléchargement du guide complet. Le premier chargement peut prendre un peu de temps.';
+ try{
+  let cache=localStorage.getItem('tv-epg-cache'),cachedAt=+(localStorage.getItem('tv-epg-time')||0);
+  if(cache&&Date.now()-cachedAt<6*3600000){let obj=JSON.parse(cache);channels=obj.channels;programmes=obj.programmes.map(p=>({...p,start:new Date(p.start),stop:new Date(p.stop)}));$('#status').textContent='Guide en cache';$('#notice').textContent='Guide chargé depuis le cache local. Dernière récupération : '+new Date(cachedAt).toLocaleString('fr-FR');render();return}
+  const response=await fetch(EPG_URL,{cache:'no-store'});if(!response.ok)throw Error('HTTP '+response.status);
+  let buf=await response.arrayBuffer(),bytes;
+  if(typeof DecompressionStream==='undefined')throw Error('Compression gzip non prise en charge par ce navigateur');
+  const stream=new Blob([buf]).stream().pipeThrough(new DecompressionStream('gzip'));const decompressed=await new Response(stream).arrayBuffer();
+  const xml=new DOMParser().parseFromString(new TextDecoder('utf-8').decode(decompressed),'application/xml');
+  if(xml.querySelector('parsererror'))throw Error('Flux XML invalide');
+  channels=[...xml.querySelectorAll('channel')].map(c=>({id:c.getAttribute('id'),name:txt(c,'display-name')||c.getAttribute('id'),icon:c.querySelector('icon')?.getAttribute('src')||''}));
+  programmes=[...xml.querySelectorAll('programme')].map(p=>({channel:p.getAttribute('channel'),start:parseStamp(p.getAttribute('start')),stop:parseStamp(p.getAttribute('stop')),title:txt(p,'title'),desc:txt(p,'desc'),cat:txt(p,'category')})).filter(p=>p.start&&p.stop&&p.title);
+  if(!channels.length||!programmes.length)throw Error('Aucun programme reçu');
+  localStorage.setItem('tv-epg-cache',JSON.stringify({channels,programmes:programmes.map(p=>({...p,start:p.start.toISOString(),stop:p.stop.toISOString()}))}));localStorage.setItem('tv-epg-time',Date.now());
+  $('#status').textContent='À jour · '+channels.length+' chaînes';$('#notice').textContent='Guide chargé : '+channels.length+' chaînes et '+programmes.length.toLocaleString('fr-FR')+' programmes. La source est mise à jour indépendamment de ce site.';
+  render();
+ }catch(e){console.error(e);$('#status').textContent='Source indisponible';$('#notice').innerHTML='Impossible de charger automatiquement le guide depuis cette page ('+safe(e.message)+'). Cela peut venir des restrictions d’accès du fournisseur (CORS) ou de la connexion. Réessayez plus tard. <a href="https://www.xmltvfr.fr/" target="_blank" rel="noopener">Ouvrir XML TV FR</a>.';$('#list').innerHTML='<div class="empty">Les données du guide ne sont pas accessibles pour le moment.</div>'}
+}
+$('#search').addEventListener('input',render);
+$('#filters').addEventListener('click',e=>{let b=e.target.closest('button');if(!b)return;filter=b.dataset.filter;document.querySelectorAll('#filters button').forEach(x=>x.classList.toggle('active',x===b));render()});
+$('#refresh').onclick=()=>{localStorage.removeItem('tv-epg-cache');localStorage.removeItem('tv-epg-time');load()};
+$('#favorites').onclick=()=>{onlyFav=!onlyFav;$('#favorites').classList.toggle('primary',onlyFav);render()};
+$('#allchannels').onclick=()=>{showAll=!showAll;$('#allchannels').textContent=showAll?'▦ Chaînes':'▦ Voir moins';render()};
+$('#bouquet').onchange=e=>{if(e.target.value==='tnt'){channels=channels.filter(c=>/^(TF1|France [234]|France 5|M6|Arte|C8|W9|TMC|TFX|NRJ 12|LCP|BFM TV|CNews|CStar|Gulli|TF1 Séries Films|L'Equipe|6ter|RMC)/i.test(c.name));render()}else load()};
+makeDays();$('#todayline').textContent=new Intl.DateTimeFormat('fr-FR',{dateStyle:'full'}).format(new Date());load();
+</script>
+</body></html>
