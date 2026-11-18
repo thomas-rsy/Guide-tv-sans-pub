@@ -61,8 +61,14 @@ a{color:#bdb5ff}
  <button id="allchannels">▦ Chaînes</button>
 </footer>
 <script>
-const EPG_URL='https://xmltvfr.fr/xmltv/xmltv_tnt.xml.gz';
-const CACHE_DATA_KEY='tv-tnt-epg-cache-v2', CACHE_TIME_KEY='tv-tnt-epg-time-v2';
+const EPG_SOURCES=[
+ {name:'XML TV FR TNT',url:'https://xmltvfr.fr/xmltv/xmltv_tnt.xml.gz',strict:true},
+ {name:'XMLTV.live France',url:'https://xmltv.live/epg/fr.xml.gz',strict:false},
+ {name:'IPTV-EPG France',url:'https://iptv-epg.org/files/epg-fr.xml.gz',strict:false},
+ {name:'EPG.pw France',url:'https://epg.pw/xmltv/epg_FR.xml.gz',strict:false}
+];
+const TNT_NAME=/\b(TF1|France ?2|France ?3|France ?4|France ?5|M6|Arte|W9|TMC|TFX|Gulli|BFM ?TV|CNews|LCI|LCP|France ?info|CStar|6ter|RMC ?Découverte|RMC ?Story|T18|Novo ?19|L\'Équipe|Canal ?\+)\b/i;
+const CACHE_DATA_KEY='tv-tnt-epg-cache-v3', CACHE_TIME_KEY='tv-tnt-epg-time-v3';
 const $=s=>document.querySelector(s);
 let channels=[],programmes=[],selectedDate=new Date(),filter='all',onlyFav=false,showAll=true,favorites=new Set(JSON.parse(localStorage.getItem('tv-favs')||'[]'));
 const fmtDate=d=>new Intl.DateTimeFormat('fr-FR',{weekday:'short',day:'numeric',month:'short'}).format(d);
@@ -100,24 +106,44 @@ function render(){
   card.append(head,body);$('#list').append(card);
  }
 }
+async function parseFeed(source){
+ const response=await fetch(source.url,{cache:'no-store'});
+ if(!response.ok)throw Error('HTTP '+response.status);
+ const buf=await response.arrayBuffer();
+ if(typeof DecompressionStream==='undefined')throw Error('Compression gzip non prise en charge');
+ const decompressed=await new Response(new Blob([buf]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();
+ const xml=new DOMParser().parseFromString(new TextDecoder('utf-8').decode(decompressed),'application/xml');
+ if(xml.querySelector('parsererror'))throw Error('Flux XML invalide');
+ let allChannels=[...xml.querySelectorAll('channel')].map(c=>({id:c.getAttribute('id'),name:txt(c,'display-name')||c.getAttribute('id'),icon:c.querySelector('icon')?.getAttribute('src')||''}));
+ let allPrograms=[...xml.querySelectorAll('programme')].map(p=>({channel:p.getAttribute('channel'),start:parseStamp(p.getAttribute('start')),stop:parseStamp(p.getAttribute('stop')),title:txt(p,'title'),desc:txt(p,'desc'),cat:txt(p,'category')})).filter(p=>p.start&&p.stop&&p.title);
+ if(source.strict){if(!allChannels.length||!allPrograms.length)throw Error('Aucun programme reçu');return {channels:allChannels,programmes:allPrograms}}
+ // Les sources nationales de secours couvrent davantage de chaînes : on ne garde que les chaînes TNT françaises connues.
+ const keep=allChannels.filter(c=>TNT_NAME.test(c.name));
+ const ids=new Set(keep.map(c=>c.id));
+ const filtered=allPrograms.filter(p=>ids.has(p.channel));
+ if(!keep.length||!filtered.length)throw Error('Aucune chaîne TNT reconnue dans cette source');
+ return {channels:keep,programmes:filtered};
+}
 async function load(){
- $('#status').textContent='Chargement…';$('#notice').textContent='Chargement du guide des chaînes de la TNT.';
- try{
-  let cache=localStorage.getItem(CACHE_DATA_KEY),cachedAt=+(localStorage.getItem(CACHE_TIME_KEY)||0);
-  if(cache&&Date.now()-cachedAt<6*3600000){let obj=JSON.parse(cache);channels=obj.channels;programmes=obj.programmes.map(p=>({...p,start:new Date(p.start),stop:new Date(p.stop)}));$('#status').textContent='Guide en cache';$('#notice').textContent='Guide chargé depuis le cache local. Dernière récupération : '+new Date(cachedAt).toLocaleString('fr-FR');render();return}
-  const response=await fetch(EPG_URL,{cache:'no-store'});if(!response.ok)throw Error('HTTP '+response.status);
-  let buf=await response.arrayBuffer(),bytes;
-  if(typeof DecompressionStream==='undefined')throw Error('Compression gzip non prise en charge par ce navigateur');
-  const stream=new Blob([buf]).stream().pipeThrough(new DecompressionStream('gzip'));const decompressed=await new Response(stream).arrayBuffer();
-  const xml=new DOMParser().parseFromString(new TextDecoder('utf-8').decode(decompressed),'application/xml');
-  if(xml.querySelector('parsererror'))throw Error('Flux XML invalide');
-  channels=[...xml.querySelectorAll('channel')].map(c=>({id:c.getAttribute('id'),name:txt(c,'display-name')||c.getAttribute('id'),icon:c.querySelector('icon')?.getAttribute('src')||''}));
-  programmes=[...xml.querySelectorAll('programme')].map(p=>({channel:p.getAttribute('channel'),start:parseStamp(p.getAttribute('start')),stop:parseStamp(p.getAttribute('stop')),title:txt(p,'title'),desc:txt(p,'desc'),cat:txt(p,'category')})).filter(p=>p.start&&p.stop&&p.title);
-  if(!channels.length||!programmes.length)throw Error('Aucun programme reçu');
-  localStorage.setItem(CACHE_DATA_KEY,JSON.stringify({channels,programmes:programmes.map(p=>({...p,start:p.start.toISOString(),stop:p.stop.toISOString()}))}));localStorage.setItem(CACHE_TIME_KEY,Date.now());
-  $('#status').textContent='TNT à jour · '+channels.length+' chaînes';$('#notice').textContent='Guide chargé : '+channels.length+' chaînes et '+programmes.length.toLocaleString('fr-FR')+' programmes. La source est mise à jour indépendamment de ce site.';
-  render();
- }catch(e){console.error(e);$('#status').textContent='Source indisponible';$('#notice').innerHTML='Impossible de charger automatiquement le guide depuis cette page ('+safe(e.message)+'). Cela peut venir des restrictions d’accès du fournisseur (CORS) ou de la connexion. Réessayez plus tard. <a href="https://www.xmltvfr.fr/" target="_blank" rel="noopener">Ouvrir XML TV FR</a>.';$('#list').innerHTML='<div class="empty">Les données du guide ne sont pas accessibles pour le moment.</div>'}
+ $('#status').textContent='Chargement…';$('#notice').textContent='Récupération du guide TNT. Plusieurs sources sont prévues en cas de panne.';
+ let cache=localStorage.getItem(CACHE_DATA_KEY),cachedAt=+(localStorage.getItem(CACHE_TIME_KEY)||0);
+ if(cache&&Date.now()-cachedAt<6*3600000){try{let obj=JSON.parse(cache);channels=obj.channels;programmes=obj.programmes.map(p=>({...p,start:new Date(p.start),stop:new Date(p.stop)}));$('#status').textContent='Guide en cache';$('#notice').textContent='Guide chargé depuis le cache local. Dernière récupération : '+new Date(cachedAt).toLocaleString('fr-FR');render();return}catch(e){localStorage.removeItem(CACHE_DATA_KEY)}}
+ const errors=[];
+ for(const source of EPG_SOURCES){
+  try{
+   $('#status').textContent='Essai : '+source.name;
+   const data=await parseFeed(source);
+   channels=data.channels;programmes=data.programmes;
+   localStorage.setItem(CACHE_DATA_KEY,JSON.stringify({channels,programmes:programmes.map(p=>({...p,start:p.start.toISOString(),stop:p.stop.toISOString()}))}));
+   localStorage.setItem(CACHE_TIME_KEY,Date.now());
+   $('#status').textContent='TNT à jour · '+channels.length+' chaînes';
+   $('#notice').textContent='Guide chargé depuis '+source.name+' : '+channels.length+' chaînes TNT et '+programmes.length.toLocaleString('fr-FR')+' programmes. Dernière récupération : '+new Date().toLocaleString('fr-FR');
+   render();return;
+  }catch(e){console.warn(source.name,e);errors.push(source.name+' : '+e.message)}
+ }
+ $('#status').textContent='Sources indisponibles';
+ $('#notice').textContent='Aucune source de programme n’a répondu. Détails : '+errors.join(' · ')+'. Réessayez plus tard.';
+ $('#list').innerHTML='<div class="empty">Les programmes TNT ne sont pas accessibles pour le moment. Le site reste disponible ; utilisez Actualiser pour réessayer.</div>';
 }
 $('#search').addEventListener('input',render);
 $('#filters').addEventListener('click',e=>{let b=e.target.closest('button');if(!b)return;filter=b.dataset.filter;document.querySelectorAll('#filters button').forEach(x=>x.classList.toggle('active',x===b));render()});
