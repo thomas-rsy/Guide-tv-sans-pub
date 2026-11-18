@@ -25,6 +25,8 @@ input{flex:1;min-width:160px}select{max-width:100%}button{cursor:pointer}button.
 .logo img{width:100%;height:100%;object-fit:contain;background:white}
 .chname{font-weight:750}.chid{font-size:11px;color:var(--muted);margin-top:3px}.chev{margin-left:auto;color:var(--muted)}
 .programs{border-top:1px solid var(--line);padding:4px 12px 10px}
+.daypart-title{margin:12px 0 2px;padding:7px 9px;border-radius:8px;background:var(--panel2);color:#c8c1ff;font-size:12px;font-weight:800;letter-spacing:.04em;text-transform:uppercase}
+.daypart-title:first-child{margin-top:7px}
 .program{display:grid;grid-template-columns:58px 1fr;gap:10px;padding:10px 0;border-bottom:1px solid #252d3a}.program:last-child{border:0}
 .time{font-variant-numeric:tabular-nums;color:#bcb4ff;font-weight:750;font-size:13px}
 .pname{font-weight:650}.desc{font-size:12px;color:var(--muted);margin-top:4px;line-height:1.45}
@@ -78,11 +80,19 @@ function txt(el,tag){return el.getElementsByTagName(tag)[0]?.textContent?.trim()
 function safe(s){return (s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function category(p){let s=(p.cat||'').toLowerCase()+' '+p.title.toLowerCase();if(/film|cinéma|movie/.test(s))return'film';if(/série|feuilleton|episode/.test(s))return'series';if(/sport|football|rugby|tennis/.test(s))return'sport';if(/journal|information|actualité|news/.test(s))return'info';if(/documentaire|docu/.test(s))return'doc';return'other'}
 function localTime(d){return new Intl.DateTimeFormat('fr-FR',{hour:'2-digit',minute:'2-digit'}).format(d)}
+// Ordre de présentation des chaînes TNT, indépendant de l'ordre fourni par les flux XMLTV.
+const CHANNEL_ORDER=[
+ ['TF1',/^tf1\b/],['France 2',/^france ?2\b/],['France 3',/^france ?3\b/],['France 4',/^france ?4\b/],['France 5',/^france ?5\b/],['M6',/^m6\b/],['Arte',/^arte\b/],['LCP',/^lcp\b|la chaine parlementaire/],['W9',/^w9\b/],['TMC',/^tmc\b/],['TFX',/^tfx\b/],['Gulli',/^gulli\b/],['BFM TV',/^bfm ?tv\b/],['CNews',/^cnews\b/],['LCI',/^lci\b/],['Franceinfo',/^france ?info\b/],['CStar',/^cstar\b/],['6ter',/^6ter\b/],['RMC Story',/^rmc ?story\b/],['RMC Découverte',/^rmc ?decouverte\b/],['L’Équipe',/^l.?equipe\b/],['T18',/^t18\b/],['Novo 19',/^novo ?19\b/],['Canal+',/^canal ?\+/]
+];
+function channelRank(name){const n=(name||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();const i=CHANNEL_ORDER.findIndex(x=>x[1].test(n));return i<0?999:i}
+function daypart(date){const h=date.getHours();if(h>=6&&h<12)return 'Matin';if(h>=12&&h<18)return 'Après-midi';if(h>=18&&h<23)return 'Soir';return 'Nuit'}
+const DAYPARTS=['Matin','Après-midi','Soir','Nuit'];
 function makeDays(){let el=$('#days');el.innerHTML='';for(let i=0;i<8;i++){let d=new Date();d.setHours(0,0,0,0);d.setDate(d.getDate()+i);let b=document.createElement('button');b.textContent=i===0?"Aujourd'hui":i===1?'Demain':fmtDate(d);b.className=dayKey(d)===dayKey(selectedDate)?'active':'';b.onclick=()=>{selectedDate=d;makeDays();render()};el.append(b)}}
 function render(){
  const q=$('#search').value.toLowerCase().trim(),now=new Date(),start=dayKey(selectedDate),end=start+86400000;
  $('#heading').textContent=filter==='now'?'En ce moment':fmtDate(selectedDate);
  let list=channels.map(c=>({...c,ps:programmes.filter(p=>p.channel===c.id&&p.start<end&&p.stop>start)}));
+ list.sort((a,b)=>channelRank(a.name)-channelRank(b.name)||(a.name||'').localeCompare(b.name||'','fr'));
  list=list.filter(c=>c.ps.length && (!q||c.name.toLowerCase().includes(q)||c.ps.some(p=>(p.title+' '+p.desc).toLowerCase().includes(q))) && (!onlyFav||favorites.has(c.id)));
  if(filter==='now')list=list.filter(c=>c.ps.some(p=>p.start<=now&&p.stop>now));
  else if(filter!=='all')list=list.filter(c=>c.ps.some(p=>category(p)===filter));
@@ -96,12 +106,18 @@ function render(){
   let logo=c.icon?`<img src="${safe(c.icon)}" loading="lazy" onerror="this.remove()">`:safe(c.name.slice(0,4).toUpperCase());
   head.innerHTML=`<div class="logo">${logo}</div><div><div class="chname">${safe(c.name)}</div><div class="chid">${c.ps.length} programme(s) sur cette journée</div></div><button class="favbtn" aria-label="Favori" style="margin-left:auto;padding:7px 10px;background:transparent;border:0;color:${favorites.has(c.id)?'#ffd76a':'#9ba6b8'}">${favorites.has(c.id)?'★':'☆'}</button><div class="chev">⌄</div>`;
   const body=document.createElement('div');body.className='programs';
-  c.ps.sort((a,b)=>a.start-b.start).forEach(p=>{
-   let active=p.start<=now&&p.stop>now,mins=Math.max(1,(p.stop-p.start)/60000),pct=active?Math.min(100,Math.max(0,(now-p.start)/ (p.stop-p.start)*100)):0;
-   const row=document.createElement('div');row.className='program';
-   row.innerHTML=`<div class="time">${localTime(p.start)}<div class="muted">${localTime(p.stop)}</div></div><div><div class="pname">${active?'● ':''}${safe(p.title)}</div>${p.desc?`<div class="desc">${safe(p.desc)}</div>`:''}${active?`<div class="progress"><i style="width:${pct}%"></i></div>`:''}</div>`;
-   body.append(row);
-  });
+  c.ps.sort((a,b)=>a.start-b.start);
+  for(const part of DAYPARTS){
+   const entries=c.ps.filter(p=>daypart(p.start)===part);
+   if(!entries.length)continue;
+   const label=document.createElement('div');label.className='daypart-title';label.textContent=part;body.append(label);
+   for(const p of entries){
+    let active=p.start<=now&&p.stop>now,pct=active?Math.min(100,Math.max(0,(now-p.start)/(p.stop-p.start)*100)):0;
+    const row=document.createElement('div');row.className='program';
+    row.innerHTML=`<div class="time">${localTime(p.start)}<div class="muted">${localTime(p.stop)}</div></div><div><div class="pname">${active?'● ':''}${safe(p.title)}</div>${p.desc?`<div class="desc">${safe(p.desc)}</div>`:''}${active?`<div class="progress"><i style="width:${pct}%"></i></div>`:''}</div>`;
+    body.append(row);
+   }
+  }
   head.querySelector('.favbtn').onclick=(ev)=>{ev.stopPropagation();if(favorites.has(c.id))favorites.delete(c.id);else favorites.add(c.id);localStorage.setItem('tv-favs',JSON.stringify([...favorites]));render()};head.onclick=()=>{body.hidden=!body.hidden;head.querySelector('.chev').textContent=body.hidden?'›':'⌄'};
   card.append(head,body);$('#list').append(card);
  }
